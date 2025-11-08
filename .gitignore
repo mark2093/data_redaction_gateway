@@ -49,6 +49,7 @@ htmlcov/
 *.log
 logs/
 *.log.*
+!conversation.log
 
 # Output
 output/*.json
