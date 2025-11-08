@@ -1,0 +1,16 @@
+{
+  "order_id": "ORD-123456",
+  "customer": {
+    "name": "John Smith",
+    "email": "john.smith@example.com",
+    "phone": "555-123-4567",
+    "billing_address": "123 Main St, New York, NY 10001",
+    "credit_card": "4532015112830366",
+    "expiry": "12/25",
+    "cvv": "123"
+  },
+  "order_date": "2025-11-08T10:30:00",
+  "amount": 299.99,
+  "currency": "USD",
+  "notes": "Please deliver ASAP"
+}

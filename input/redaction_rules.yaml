@@ -1,40 +1,147 @@
-# Redaction Rules Configuration
-# This file defines the rules for identifying and redacting PII/PCI data
-
-# Instructions: Please update this file with actual redaction rules
-# based on the problem statement requirements
-
+version: "1.4"
+effective_date: "2025-11-08"
 rules:
-  # Example rule structure - to be replaced with actual rules
-  - name: example_rule
-    description: "Example redaction rule"
-    pattern: ""
-    redaction_type: "full"  # Options: full, partial, hash, tokenize
+  # ==============================
+  # EMAIL (partial mask - preserve structure)
+  # ==============================
+  - id: EMAIL_REGEX
+    pattern: '\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
+    action: mask
+    severity: medium
+    tags: [GDPR, PRIVACY]
     enabled: true
+    mask_config:
+      mode: preserve_structure
+      preserve_first: 1
+      preserve_last: 1
+      preserve_domain: true
+      replacement_char: "*"
+    examples:
+      original: "john.doe@example.com"
+      redacted: "j*******@e*******.com"
     
-  # Add more rules here as per requirements
-  # Example patterns:
-  # - Credit Card: '\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b'
-  # - SSN: '\b\d{3}-\d{2}-\d{4}\b'
-  # - Email: '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'
-  # - Phone: '\b\d{3}[-.]?\d{3}[-.]?\d{4}\b'
-
-# Redaction strategies configuration
-strategies:
-  full:
-    replacement: "***REDACTED***"
-  partial:
-    keep_first: 0
-    keep_last: 4
-    replacement_char: "X"
-  hash:
-    algorithm: "sha256"
-    show_prefix: false
-  tokenize:
-    token_prefix: "TOKEN_"
+  # ==============================
+  # CREDIT CARD / PAN (preserve last 4 with Luhn validation)
+  # ==============================
+  - id: LUHN_PAN
+    pattern: '(?:\d[ -]*?){13,19}'
+    action: mask
+    severity: high
+    tags: [PCI_DSS_4_0]
+    enabled: true
+    mask_config:
+      mode: preserve_last
+      preserve_last: 4
+      replacement_char: "*"
+      keep_separators: false
+      validate_luhn: true
+    examples:
+      original: "4111111111111111"
+      redacted: "************1111"
     
-# Global settings
-settings:
-  case_sensitive: false
-  log_matches: true
-  audit_enabled: true
+  # ==============================
+  # CVV (always full mask)
+  # ==============================
+  - id: CVV_REGEX
+    pattern: '(?<="cvv"\s*:\s*")\d{3,4}(?=")'
+    action: mask
+    severity: high
+    tags: [PCI_DSS_4_0]
+    enabled: true
+    mask_config:
+      mode: full
+      replacement_char: "*"
+    examples:
+      original: "337"
+      redacted: "***"
+    
+  # ==============================
+  # PHONE (preserve last 4 digits)
+  # ==============================
+  - id: PHONE_REGEX
+    pattern: '(?:\+?\d{1,3}[-.\s]?)?(?:\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4})(?:x\d{1,5})?'
+    action: mask
+    severity: medium
+    tags: [GDPR, PRIVACY]
+    enabled: true
+    mask_config:
+      mode: preserve_last
+      preserve_last: 4
+      replacement_char: "*"
+      keep_separators: false
+    examples:
+      original_1: "881-963-7849"
+      redacted_1: "***-***-7849"
+      original_2: "(431)369-1017x3654"
+      redacted_2: "************3654"
+    
+  # ==============================
+  # IBAN (preserve first 2 and last 4)
+  # ==============================
+  - id: IBAN_REGEX
+    pattern: '[A-Z]{2}\d{2}[A-Z0-9]{4}\d{7}([A-Z0-9]?){0,16}'
+    action: mask
+    severity: high
+    tags: [PCI_DSS_4_0, GDPR]
+    enabled: true
+    mask_config:
+      mode: preserve_first_last
+      preserve_first: 4
+      preserve_last: 4
+      replacement_char: "*"
+    examples:
+      original: "GB82WEST12345698765432"
+      redacted: "GB82****************5432"
+    
+  # ==============================
+  # ACCOUNT NUMBER (preserve last 4)
+  # ==============================
+  - id: ACCOUNT_REGEX
+    pattern: '\b\d{8,12}\b'
+    action: mask
+    severity: high
+    tags: [PCI_DSS_4_0]
+    enabled: true
+    mask_config:
+      mode: preserve_last
+      preserve_last: 4
+      replacement_char: "*"
+    examples:
+      original: "123456789012"
+      redacted: "********9012"
+    
+  # ==============================
+  # SSN (preserve last 4)
+  # ==============================
+  - id: SSN_REGEX
+    pattern: '\b\d{3}-\d{2}-\d{4}\b'
+    action: mask
+    severity: critical
+    tags: [GDPR, PRIVACY]
+    enabled: true
+    mask_config:
+      mode: preserve_last
+      preserve_last: 4
+      replacement_char: "*"
+      keep_separators: true
+    examples:
+      original: "123-45-6789"
+      redacted: "***-**-6789"
+    
+  # ==============================
+  # PERSON NAME (NER-based, full redaction)
+  # ==============================
+  - id: NAME_NER
+    engine: "NER"
+    model: "spaCy_en_core_web_sm"
+    action: mask
+    severity: medium
+    tags: [GDPR, PRIVACY]
+    enabled: true
+    mask_config:
+      mode: full
+      replacement_char: "*"
+      preserve_length: true
+    examples:
+      original: "Alice Johnson"
+      redacted: "*************"

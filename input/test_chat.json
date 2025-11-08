@@ -1,0 +1,22 @@
+[
+  {
+    "chat_id": "C12345",
+    "timestamp": "2025-11-08T09:15:00",
+    "message": "Hi, this is Alice Johnson, my card 4111111111111111 was declined today."
+  },
+  {
+    "chat_id": "C12346",
+    "timestamp": "2025-11-08T09:20:00",
+    "message": "My phone number is 555-987-6543, please contact me about the refund."
+  },
+  {
+    "chat_id": "C12347",
+    "timestamp": "2025-11-08T09:25:00",
+    "message": "Hello, my email is support@customer.com and I can't log into my account."
+  },
+  {
+    "chat_id": "C72875",
+    "timestamp": "2025-10-28T06:45:07.277933",
+    "message": "My phone number is 075.485.8002x1779, please contact me about the refund."
+  }
+]

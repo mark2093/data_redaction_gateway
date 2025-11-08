@@ -1,33 +1,240 @@
-# Application Configuration
+# Runtime PII/PCI Data Redaction Gateway Configuration
+# All settings are configurable via this YAML file
 
-# Stream Processing Settings
-stream:
-  buffer_size: 1000
-  batch_size: 100
-  timeout_seconds: 30
+# Application Settings
+app:
+  name: "PII/PCI Data Redaction Gateway"
+  version: "1.0.0"
+  environment: "development"  # development, staging, production
 
-# Redaction Settings
+# Server Configuration
+server:
+  host: "0.0.0.0"
+  port: 8000
+  reload: false  # Auto-reload on code changes (development only)
+  workers: 1     # Number of worker processes
+  log_level: "info"  # debug, info, warning, error, critical
+
+# Security Settings
+security:
+  # API Keys (override with environment variable API_KEYS)
+  api_keys:
+    - "dev-api-key-12345"
+    - "test-api-key-67890"
+  
+  # HMAC key for tokenization (override with HMAC_SECRET_KEY)
+  hmac_secret: "default-hmac-key-change-in-production"
+  
+  # Encryption key for FPE (override with ENCRYPTION_KEY)
+  encryption_key: "default-encryption-key-change-in-production"
+  
+  # TLS/SSL Configuration
+  tls:
+    enabled: false
+    cert_file: null
+    key_file: null
+    ca_file: null
+  
+  # mTLS Configuration
+  mtls:
+    enabled: false
+    require_client_cert: false
+  
+  # Log Sanitization
+  sanitize_logs: true
+  log_redacted_fields: false  # Whether to log which fields were redacted (sanitized)
+
+# Redaction Policy
 redaction:
-  rules_file: "input/redaction_rules.yaml"
-  audit_enabled: true
-  log_matches: true
+  # Policy file location
+  policy_file: "input/redaction_rules.yaml"
+  
+  # Default action if no rule matches
+  default_action: "allow"  # allow, deny, mask
+  
+  # Redaction behavior
+  preserve_structure: true  # Maintain JSON/data structure
+  preserve_format: true     # Maintain format (e.g., email format)
+  show_last_n_chars: 4      # For masking, show last N characters
+  
+  # Detection settings
+  detection:
+    case_sensitive: false
+    whole_words_only: false  # For text patterns
+    validate_checksums: true  # Enable Luhn validation for credit cards
+  
+  # NER (Named Entity Recognition) Settings
+  ner:
+    enabled: true
+    model: "en_core_web_sm"  # spaCy model
+    confidence_threshold: 0.8
+    entity_types:
+      - "PERSON"
+      # - "ORG"      # Uncomment to detect organizations
+      # - "GPE"      # Uncomment to detect geopolitical entities
+      # - "LOC"      # Uncomment to detect locations
+  
+  # Field-specific rules (override global rules for specific fields)
+  field_overrides:
+    # Example: Don't redact order_id or transaction_id
+    exclude_fields:
+      - "order_id"
+      - "txn_id"
+      - "transaction_id"
+      - "order_date"
+      - "timestamp"
+      - "amount"
+      - "currency"
+      - "notes"
+      - "merchant"
+    
+    # Example: Always redact these fields regardless of content
+    always_redact_fields:
+      - "password"
+      - "secret"
+      - "api_key"
+      - "token"
+
+# Caching Configuration
+cache:
+  enabled: true
+  ttl_seconds: 300        # Time-to-live for cache entries
+  max_size: 1000          # Maximum number of cached items
+  cache_decisions: true   # Cache redaction decisions
+  cache_patterns: true    # Cache compiled regex patterns
+
+# Performance Settings
+performance:
+  # Request processing
+  max_request_size_mb: 10
+  request_timeout_seconds: 30
+  
+  # Async processing
+  max_workers: 4
+  async_batch_size: 100
+  
+  # Rate limiting (per API key)
+  rate_limit:
+    enabled: false
+    requests_per_minute: 100
+    burst: 20
+
+# Observability Settings
+observability:
+  # Metrics
+  metrics:
+    enabled: true
+    collect_latency: true
+    collect_coverage: true
+    history_size: 10000  # Number of latency measurements to keep
+  
+  # OpenTelemetry
+  tracing:
+    enabled: true
+    service_name: "pii-redaction-gateway"
+    export_spans: false  # Set to true to export spans
+    exporter_endpoint: null  # e.g., "http://localhost:4318"
+  
+  # Health checks
+  health:
+    enabled: true
+    include_cache_stats: true
+    include_policy_info: true
+
+# Logging Configuration
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  
+  # File logging
+  file:
+    enabled: false
+    path: "logs/redaction_gateway.log"
+    max_bytes: 10485760  # 10MB
+    backup_count: 5
+  
+  # Console logging
+  console:
+    enabled: true
+    colorize: true
+
+# Stream Simulator Settings (for testing)
+simulator:
+  default_mode: "mixed"
+  default_count: 10
+  default_interval_ms: 1000
+  
+  # Data generation
+  generation:
+    use_realistic_data: true
+    locale: "en_US"
+    
+  # Request settings
+  timeout_seconds: 30
+  retry_attempts: 3
+  retry_delay_seconds: 1
 
 # Output Settings
 output:
   directory: "output"
   format: "json"  # json, text, csv
   include_metadata: true
+  pretty_print: true
   timestamp_format: "%Y-%m-%d_%H-%M-%S"
+  
+  # Metadata options
+  metadata:
+    include_timestamp: true
+    include_rule_id: true
+    include_action: true
+    include_field_path: true
+    include_processing_time: true
 
-# Logging
-logging:
-  level: "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
-  file: "logs/application.log"
-  console: true
-  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+# LLM-as-Judge Settings
+llm_judge:
+  enabled: true  # Enable LLM validation
+  sampling_rate: 0.15  # Sample 15% of requests
+  timeout_seconds: 5
+  fallback_on_error: true
+  
+  # LLM Configuration
+  provider: "openai"  # openai, anthropic, or local
+  model: "gpt-4o-mini"  # Cost-effective, fast model for validation
+  api_key: "${LLM_API_KEY}"  # Set via environment variable LLM_API_KEY
+  endpoint: null  # Use default OpenAI endpoint
+  
+  # Budget controls
+  budget:
+    max_calls_per_hour: 100
+    max_calls_per_day: 1000
+    alert_on_limit: true
+  
+  # Validation settings
+  validation:
+    check_coverage: true
+    check_over_redaction: true
+    check_under_redaction: true
+    max_context_chars: 500  # Limit context sent to LLM
+    include_partial_mask: true  # Partially mask PII in context
 
-# Performance
-performance:
-  max_workers: 4
-  enable_caching: true
-  cache_ttl_seconds: 300
+# Compliance Settings
+compliance:
+  # GDPR
+  gdpr:
+    enabled: true
+    data_retention_days: 0  # Don't store any data
+    audit_trail: true
+  
+  # PCI DSS
+  pci_dss:
+    enabled: true
+    version: "4.0"
+    mask_pan: true
+    log_access: true
+
+# Development/Debug Settings
+debug:
+  enabled: false
+  verbose_errors: false
+  save_failed_requests: false
+  failed_requests_dir: "debug/failed_requests"

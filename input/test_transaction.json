@@ -1,0 +1,11 @@
+{
+  "txn_id": "TXN-9876543",
+  "account_no": "1234567890",
+  "iban": "GB82WEST12345698765432",
+  "pan": "5425233430109903",
+  "amount": 1500.00,
+  "currency": "USD",
+  "merchant": "Tech Store Inc",
+  "customer_name": "Jane Doe",
+  "timestamp": "2025-11-08T14:45:00"
+}
