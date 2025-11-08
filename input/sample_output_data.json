@@ -1,0 +1,13 @@
+{
+  "note": "This file will contain the expected output after redaction is applied.",
+  "instructions": "Please replace this content with actual sample output data showing how sensitive data should be redacted.",
+  "expected_format": {
+    "records": [
+      {
+        "field1": "value1",
+        "field2": "value2",
+        "sensitive_data": "***REDACTED***"
+      }
+    ]
+  }
+}

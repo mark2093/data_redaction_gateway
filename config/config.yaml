@@ -1,0 +1,33 @@
+# Application Configuration
+
+# Stream Processing Settings
+stream:
+  buffer_size: 1000
+  batch_size: 100
+  timeout_seconds: 30
+
+# Redaction Settings
+redaction:
+  rules_file: "input/redaction_rules.yaml"
+  audit_enabled: true
+  log_matches: true
+
+# Output Settings
+output:
+  directory: "output"
+  format: "json"  # json, text, csv
+  include_metadata: true
+  timestamp_format: "%Y-%m-%d_%H-%M-%S"
+
+# Logging
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  file: "logs/application.log"
+  console: true
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+# Performance
+performance:
+  max_workers: 4
+  enable_caching: true
+  cache_ttl_seconds: 300

@@ -1,0 +1,13 @@
+{
+  "note": "This file will contain sample input data for testing the redaction gateway.",
+  "instructions": "Please replace this content with actual sample input data.",
+  "expected_format": {
+    "records": [
+      {
+        "field1": "value1",
+        "field2": "value2",
+        "sensitive_data": "to_be_provided"
+      }
+    ]
+  }
+}

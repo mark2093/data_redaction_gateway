@@ -1,0 +1,40 @@
+# Redaction Rules Configuration
+# This file defines the rules for identifying and redacting PII/PCI data
+
+# Instructions: Please update this file with actual redaction rules
+# based on the problem statement requirements
+
+rules:
+  # Example rule structure - to be replaced with actual rules
+  - name: example_rule
+    description: "Example redaction rule"
+    pattern: ""
+    redaction_type: "full"  # Options: full, partial, hash, tokenize
+    enabled: true
+    
+  # Add more rules here as per requirements
+  # Example patterns:
+  # - Credit Card: '\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b'
+  # - SSN: '\b\d{3}-\d{2}-\d{4}\b'
+  # - Email: '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'
+  # - Phone: '\b\d{3}[-.]?\d{3}[-.]?\d{4}\b'
+
+# Redaction strategies configuration
+strategies:
+  full:
+    replacement: "***REDACTED***"
+  partial:
+    keep_first: 0
+    keep_last: 4
+    replacement_char: "X"
+  hash:
+    algorithm: "sha256"
+    show_prefix: false
+  tokenize:
+    token_prefix: "TOKEN_"
+    
+# Global settings
+settings:
+  case_sensitive: false
+  log_matches: true
+  audit_enabled: true
