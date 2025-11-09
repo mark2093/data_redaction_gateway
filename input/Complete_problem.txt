@@ -1,0 +1,126 @@
+Problem Title:
+
+Runtime PII/PCI Data Redaction Gateway (Data Security)
+
+---
+
+Problem Statement
+
+You are tasked with designing and implementing a smart API gateway service that processes data streams in real-time to detect and redact sensitive Personally Identifiable Information (PII) and Payment Card Industry (PCI) data. The goal is to ensure compliance with regulations like GDPR and PCI DSS 4.0 while maintaining low latency and enabling easy integration as a local proxy or sidecar service.
+
+The service should act as an intermediary for API requests, inspecting and transforming request/response bodies to redact sensitive data without disrupting downstream services. It must support configurable rules, advanced redaction techniques, optional AI-based validation, and robust observability.
+
+---
+
+Requirements and Acceptance Criteria
+
+1. Detection of Sensitive Data
+
+- Implement real-time detection in data streams (e.g., JSON, text, NDJSON bodies).
+
+- Use configurable regex rules for patterns like emails, phone numbers, etc.
+
+- Apply the Luhn algorithm for detecting Primary Account Numbers (PANs).
+
+- Incorporate lightweight Named Entity Recognition (NER) using on-device or open-source models (e.g., spaCy or similar OSS libraries).
+
+- Handle optional base64 decoding and gzip/deflate decompression for encoded/compressed bodies.
+
+2. Redaction with Shape Preservation
+
+- Redact detected sensitive data while preserving the original data format and structure.
+
+- Support multiple redaction methods:
+
+- Masking (e.g., replace with `************1234` to show last 4 digits).
+
+- Deterministic tokenization using HMAC-based hashing (for joinable analytics across systems).
+
+- Format-Preserving Encryption (FPE) specifically for PANs.
+
+- Attach a `redaction_meta` block to the output, including:
+
+- Field path (e.g., JSONPath).
+
+- Matched rule.
+
+- Action taken (e.g., mask, tokenize, encrypt).
+
+- Timestamp.
+
+3. LLM-as-Judge for Validation
+
+- For approximately 10–20% of requests (sampled randomly), send a snippet-limited, partially masked context to a Large Language Model (LLM) to confirm redaction coverage and detect over/under-redaction.
+
+- On LLM timeout, error, or budget breach, gracefully degrade to rules-only mode and log the event.
+
+- Ensure the LLM prompt is secure and does not expose raw PII.
+
+
+4. Policy-as-Code
+
+- Define policies in YAML format, supporting:
+
+- Rules per route, method, tenant, region.
+
+- Effective dates and severity levels.
+
+- Mapping to basic GDPR/PCI DSS 4.0 tags.
+
+- Emit HTTP headers downstream: `X-Redaction-Policy` and `X-Policy-Version`.
+
+
+5. Warm Decision Cache
+
+- Implement a cache for detection/redaction decisions by endpoint + field + rule ID.
+
+- Use a Time-To-Live (TTL) to expire entries and reduce latency.
+
+- Never cache raw sensitive values—only decisions.
+
+
+6. Security Baseline
+
+- Support TLS termination for secure communication.
+
+- Require API keys per client, with optional mutual TLS (mTLS) for upstream services.
+
+- Ensure no raw PII is logged; sanitize all logs.
+
+- Manage secrets via `.env.sample` files and a local keystore for HMAC/FPE keys.
+
+
+7. Observability
+
+- Integrate minimal OpenTelemetry spans for key stages: detect → transform → judge → egress.
+
+- Track metrics: p95 latency, redaction coverage percentage, judge fallback rate.
+
+- Generate sanitized sample logs for debugging.
+
+
+
+8. Manual Operations and Replay
+
+- Provide a CLI tool to:
+
+- Run the proxy service.
+
+- Perform dry-run on a payload, showing before/after diff.
+
+- Include sample payloads and a Postman collection for quick testing and trials.
+
+---
+
+Constraints
+
+- The service must handle real-time processing with moderate latency (aim for <100ms overhead).
+
+- Focus on lightweight, runnable implementations suitable for local development or small-scale deployment (e.g., no heavy infrastructure dependencies).
+
+- Use open-source tools and libraries where possible.
+
+- Ensure the solution is aligned with GDPR/PCI compliance without storing or transmitting raw PII unnecessarily.
+
+
+Build a prototype that demonstrates these features. Good luck!

@@ -1,0 +1,8 @@
+# Test transaction data
+Invoke-RestMethod -Uri "http://localhost:8000/redact/dry-run" -Method POST -Headers @{"Content-Type"="application/json";"X-API-Key"="dev-api-key-12345"} -Body ((Get-Content "input/test_transaction.json" -Raw | ConvertFrom-Json | ForEach-Object { @{data=$_} } | ConvertTo-Json -Depth 10)) | ConvertTo-Json -Depth 5
+
+# Test chat data  
+Invoke-RestMethod -Uri "http://localhost:8000/redact/" -Method POST -Headers @{"Content-Type"="application/json";"X-API-Key"="dev-api-key-12345"} -Body ((@{data=(Get-Content "input/test_chat.json" -Raw | ConvertFrom-Json);include_meta=$true} | ConvertTo-Json -Depth 10)) | ConvertTo-Json -Depth 5
+
+# Test order data
+Invoke-RestMethod -Uri "http://localhost:8000/redact/" -Method POST -Headers @{"Content-Type"="application/json";"X-API-Key"="dev-api-key-12345"} -Body ((@{data=(Get-Content "input/test_order.json" -Raw | ConvertFrom-Json);include_meta=$true} | ConvertTo-Json -Depth 10)) | ConvertTo-Json -Depth 5

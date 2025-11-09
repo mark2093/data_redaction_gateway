@@ -28,7 +28,7 @@ rules:
     action: mask
     severity: high
     tags: [PCI_DSS_4_0]
-    enabled: true
+    enabled: false  # Disabled to test FPE
     mask_config:
       mode: preserve_last
       preserve_last: 4
@@ -40,20 +40,20 @@ rules:
       redacted: "************1111"
     
   # ==============================
-  # CVV (always full mask)
+  # CVV (disabled - too broad, catches house numbers, years, etc.)
   # ==============================
   - id: CVV_REGEX
-    pattern: '(?<="cvv"\s*:\s*")\d{3,4}(?=")'
+    pattern: '\b(?:cvv|cvc|security\s*code)\s*:?\s*(\d{3,4})\b'
     action: mask
     severity: high
     tags: [PCI_DSS_4_0]
-    enabled: true
+    enabled: false
     mask_config:
       mode: full
       replacement_char: "*"
     examples:
-      original: "337"
-      redacted: "***"
+      original: "cvv: 337"
+      redacted: "cvv: ***"
     
   # ==============================
   # PHONE (preserve last 4 digits)
@@ -145,3 +145,118 @@ rules:
     examples:
       original: "Alice Johnson"
       redacted: "*************"
+
+  # ==============================
+  # CUSTOMER NAME (disabled - too broad, catches addresses)
+  # ==============================
+  - id: CUSTOMER_NAME_REGEX
+    pattern: '(?i)(?:this\s+is|my\s+name\s+is|i\s+am)\s+([A-Z][a-z]+\s+[A-Z][a-z]+)'
+    action: mask
+    severity: medium
+    tags: [GDPR, PRIVACY]
+    enabled: false
+    mask_config:
+      mode: full
+      replacement_char: "*"
+    examples:
+      original: "this is Jane Doe"
+      redacted: "this is ********"
+
+  # ==============================
+  # CVV SPECIFIC - Only in credit card contexts
+  # ==============================
+  - id: CVV_SPECIFIC
+    pattern: '(?i)(?:cvv|cvc|security\s*code|verification\s*code)\s*:?\s*(\d{3,4})'
+    action: mask
+    severity: high
+    tags: [PCI_DSS_4_0]
+    enabled: true
+    mask_config:
+      mode: full
+      replacement_char: "*"
+    examples:
+      original: "CVV: 123"
+      redacted: "CVV: ***"
+
+  # ==============================
+  # NAMES in specific fields/contexts
+  # ==============================  
+  - id: FIELD_NAMES
+    pattern: '^[A-Z][a-z]+\s+[A-Z][a-z]+$'
+    action: mask
+    severity: medium
+    tags: [GDPR, PRIVACY]
+    enabled: true
+    mask_config:
+      mode: full
+      replacement_char: "*"
+    examples:
+      original: "John Smith"
+      redacted: "**********"
+
+  # ==============================
+  # MERCHANT/COMPANY NAME (catch all company indicators)
+  # ==============================
+  - id: MERCHANT_NAME_REGEX
+    pattern: '.*(?:Store|Inc|Corp|Tech).*'
+    action: mask
+    severity: low
+    tags: [PRIVACY]
+    enabled: true
+    mask_config:
+      mode: full
+      replacement_char: "*"
+    examples:
+      original: "Tech Store Inc"
+      redacted: "*************"
+
+  # ==============================
+  # FORMAT-PRESERVING ENCRYPTION RULES
+  # ==============================
+  
+  # FPE for Primary Account Numbers (Credit Cards)
+  - id: PAN_FPE
+    pattern: '\b(?:\d[ -]*?){13,19}\b'
+    action: fpe
+    severity: critical
+    tags: [PCI_DSS_4_0, FPE]
+    enabled: true
+    metadata:
+      data_type: pan
+      fpe_domain: numeric
+      preserve_format: true
+      validate_luhn: true
+    examples:
+      original: "4111111111111111"
+      redacted: "4327649283756482"  # FPE maintains 16-digit format
+    
+  # FPE for Social Security Numbers
+  - id: SSN_FPE
+    pattern: '\b\d{3}-\d{2}-\d{4}\b'
+    action: fpe
+    severity: critical
+    tags: [PII, HIPAA, FPE]
+    enabled: false  # Disabled by default - enable as needed
+    metadata:
+      data_type: ssn
+      fpe_domain: numeric
+      preserve_format: true
+      preserve_separators: true
+    examples:
+      original: "123-45-6789"
+      redacted: "847-92-3561"  # FPE maintains XXX-XX-XXXX format
+    
+  # FPE for Account Numbers
+  - id: ACCOUNT_FPE
+    pattern: '\b(?:account|acct)\s*(?:number|#)?\s*:?\s*(\d{8,16})\b'
+    action: fpe
+    severity: high
+    tags: [PCI_DSS_4_0, FPE]
+    enabled: false  # Disabled by default
+    metadata:
+      data_type: account
+      fpe_domain: numeric
+      preserve_format: true
+    examples:
+      original: "account number: 1234567890"
+      redacted: "account number: 8475923168"

@@ -22,11 +22,34 @@ security:
     - "dev-api-key-12345"
     - "test-api-key-67890"
   
+  # JWT Authentication
+  jwt:
+    enabled: true
+    secret_key: "${JWT_SECRET_KEY}"  # Set via environment variable
+    algorithm: "HS256"
+    access_token_expire_minutes: 30
+    refresh_token_expire_days: 7
+  
   # HMAC key for tokenization (override with HMAC_SECRET_KEY)
   hmac_secret: "default-hmac-key-change-in-production"
   
   # Encryption key for FPE (override with ENCRYPTION_KEY)
   encryption_key: "default-encryption-key-change-in-production"
+  
+  # Rate Limiting
+  rate_limit:
+    enabled: true
+    requests_per_minute: 60
+    requests_per_hour: 1000
+    requests_per_day: 10000
+    burst_size: 10
+  
+  # Audit Logging
+  audit:
+    enabled: true
+    log_file: "logs/audit.log"
+    console_output: true
+    max_memory_events: 1000
   
   # TLS/SSL Configuration
   tls:
@@ -86,7 +109,6 @@ redaction:
       - "amount"
       - "currency"
       - "notes"
-      - "merchant"
     
     # Example: Always redact these fields regardless of content
     always_redact_fields:

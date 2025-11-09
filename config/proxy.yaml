@@ -1,0 +1,131 @@
+# Proxy Configuration for Data Redaction Gateway
+# This configuration enables the gateway to act as a reverse proxy
+# that redacts sensitive data before forwarding to upstream services
+
+# Proxy Mode Settings
+proxy_mode: true  # Set to true to enable proxy functionality
+bind_host: "0.0.0.0"
+bind_port: 8000
+
+# Default Redaction Policy
+default_redaction_policy:
+  policy_file: "input/redaction_rules.yaml"
+  rules: null  # null means use all enabled rules from policy file
+  exclude_rules: null  # null means don't exclude any rules
+  tenant_id: null
+  region: null
+
+# Upstream Services Configuration
+upstream_services:
+  # Example: User Management Service
+  users_api:
+    name: "users_api"
+    base_url: "http://localhost:3000"
+    timeout_seconds: 30.0
+    retry_attempts: 3
+    retry_delay: 1.0
+    health_check_path: "/health"
+    health_check_interval: 30
+    headers:
+      "User-Agent": "redaction-gateway/1.0"
+      "Accept": "application/json"
+    verify_ssl: true
+
+  # Example: Payment Processing Service
+  payments_api:
+    name: "payments_api"
+    base_url: "http://localhost:3001"
+    timeout_seconds: 45.0
+    retry_attempts: 2
+    retry_delay: 2.0
+    health_check_path: "/health"
+    api_key_header: "X-API-Key"
+    api_key_value: "${PAYMENTS_API_KEY}"  # Environment variable
+    verify_ssl: true
+
+  # Example: External API Service
+  external_service:
+    name: "external_service"
+    base_url: "https://api.external.com"
+    timeout_seconds: 60.0
+    headers:
+      "Authorization": "Bearer ${EXTERNAL_API_TOKEN}"
+    verify_ssl: true
+    # mTLS configuration (optional)
+    # client_cert_path: "/path/to/client.crt"
+    # client_key_path: "/path/to/client.key"
+
+# Route Configuration
+routes:
+  # User Management Routes - Redact personal information
+  - path_pattern: "/api/v1/users/*"
+    methods: ["POST", "PUT", "PATCH"]
+    upstream_service: "users_api"
+    upstream_path: null  # Keep same path
+    redaction_policy:
+      rules: ["EMAIL_REGEX", "PHONE_REGEX", "FIELD_NAMES"]
+      exclude_rules: null
+    redact_request: true
+    redact_response: true
+    preserve_headers: ["authorization", "x-correlation-id", "x-request-id", "content-type"]
+    timeout_override: null
+    enabled: true
+
+  # Payment Processing Routes - Redact financial data
+  - path_pattern: "/api/v1/payments/*"
+    methods: ["POST"]
+    upstream_service: "payments_api"
+    redaction_policy:
+      rules: ["LUHN_PAN", "CVV_SPECIFIC", "EMAIL_REGEX", "FIELD_NAMES"]
+    redact_request: true
+    redact_response: true
+    preserve_headers: ["authorization", "x-correlation-id", "x-request-id", "content-type"]
+    timeout_override: 60.0  # Payments need longer timeout
+    enabled: true
+
+  # Customer Support Routes - Redact all PII
+  - path_pattern: "/api/v1/support/*"
+    methods: ["POST", "PUT", "PATCH"]
+    upstream_service: "users_api"
+    upstream_path: "/api/support"  # Path rewrite
+    redaction_policy:
+      policy_file: "input/redaction_rules.yaml"
+      exclude_rules: ["NAME_NER"]  # Exclude NER for performance
+    redact_request: true
+    redact_response: true
+    preserve_headers: ["authorization", "x-correlation-id"]
+    enabled: true
+
+  # External API Routes - Light redaction
+  - path_pattern: "/api/external/*"
+    methods: ["POST", "GET"]
+    upstream_service: "external_service"
+    upstream_path: "/v2/data"
+    redaction_policy:
+      rules: ["EMAIL_REGEX", "LUHN_PAN"]  # Only email and credit cards
+    redact_request: true
+    redact_response: false  # Don't redact external responses
+    preserve_headers: ["x-correlation-id", "content-type"]
+    enabled: false  # Disabled by default
+
+# Global Proxy Settings
+max_request_size: 10485760  # 10MB
+default_timeout: 30.0
+enable_health_checks: true
+
+# Header Configuration
+add_redaction_headers: true
+correlation_header: "x-correlation-id"
+
+# Example Environment Variables (.env file):
+# PAYMENTS_API_KEY=your-payments-api-key
+# EXTERNAL_API_TOKEN=your-external-api-token
+# 
+# To enable proxy mode, set proxy_mode: true above
+# 
+# Example Usage:
+# 1. Start your upstream services on ports 3000, 3001
+# 2. Set proxy_mode: true in this config
+# 3. Start the gateway: python main_modular.py
+# 4. Send requests to http://localhost:8000/api/v1/users/...
+# 5. The gateway will redact PII and forward to upstream services
