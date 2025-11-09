@@ -68,3 +68,7 @@ output/*.csv
 
 # OS
 Thumbs.db
+
+# Environment and backup files
+.env.backup
+*.backup
