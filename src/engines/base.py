@@ -117,11 +117,85 @@ class BaseRedactionEngine(ABC):
             else:
                 return replacement_char * 8
         
+        if mode == 'preserve_structure':
+            # Special handling for email addresses
+            if '@' in value and '.' in value.split('@')[-1]:
+                return self._mask_email_preserve_structure(value, mask_config)
+            # Fall back to preserve_last for non-email values
+            mode = 'preserve_last'
+        
+        if mode == 'preserve_last':
+            preserve_last = mask_config.get('preserve_last', 4)
+            if len(value) <= preserve_last:
+                return replacement_char * len(value)
+            return replacement_char * (len(value) - preserve_last) + value[-preserve_last:]
+        
+        # Default behavior
         preserve_last = mask_config.get('preserve_last', 4)
         if len(value) <= preserve_last:
             return replacement_char * len(value)
         
         return replacement_char * (len(value) - preserve_last) + value[-preserve_last:]
+    
+    def _mask_email_preserve_structure(self, email: str, mask_config: Dict[str, Any]) -> str:
+        """
+        Mask email while preserving structure.
+        
+        Example: john.doe@example.com -> j*******@e*******.com
+        
+        Args:
+            email: Email address to mask
+            mask_config: Configuration dict with:
+                - preserve_first: Number of chars to preserve in local part (default: 1)
+                - preserve_last: Number of chars to preserve in local part (default: 1)
+                - preserve_domain: Whether to preserve domain structure (default: True)
+                - replacement_char: Character to use for masking (default: '*')
+        
+        Returns:
+            Masked email address
+        """
+        replacement_char = mask_config.get('replacement_char', '*')
+        preserve_first = mask_config.get('preserve_first', 1)
+        preserve_last = mask_config.get('preserve_last', 1)
+        preserve_domain = mask_config.get('preserve_domain', True)
+        
+        # Split email into local and domain parts
+        if '@' not in email:
+            return replacement_char * len(email)
+        
+        local, domain = email.rsplit('@', 1)
+        
+        # Mask local part
+        if len(local) <= (preserve_first + preserve_last):
+            # If local part is too short, just mask it all
+            masked_local = replacement_char * len(local)
+        else:
+            # Preserve first N and last M characters
+            mask_length = len(local) - preserve_first - preserve_last
+            masked_local = local[:preserve_first] + (replacement_char * mask_length) + local[-preserve_last:]
+        
+        # Handle domain
+        if preserve_domain and '.' in domain:
+            # Preserve domain structure: example.com -> e******.com
+            domain_parts = domain.split('.')
+            masked_domain_parts = []
+            
+            for part in domain_parts[:-1]:  # All parts except TLD
+                if len(part) <= 1:
+                    masked_domain_parts.append(part)
+                else:
+                    # Preserve first character of each domain part
+                    masked_part = part[0] + (replacement_char * (len(part) - 1))
+                    masked_domain_parts.append(masked_part)
+            
+            # Keep TLD as-is
+            masked_domain_parts.append(domain_parts[-1])
+            masked_domain = '.'.join(masked_domain_parts)
+        else:
+            # Fully mask domain
+            masked_domain = replacement_char * len(domain)
+        
+        return f"{masked_local}@{masked_domain}"
     
     def _mask_value(self, value: str) -> str:
         """Default masking implementation."""
