@@ -5,7 +5,7 @@ import asyncio
 import json
 import logging
 from typing import AsyncGenerator, Optional
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, HTTPException
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, HTTPException, Request, Body
 from fastapi.responses import StreamingResponse
 
 from ...engines.base import RedactionEngine
@@ -18,9 +18,53 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/stream", tags=["Streaming"])
 
 
-@router.post("/redact/ndjson")
+@router.post(
+    "/redact/ndjson",
+    response_class=StreamingResponse,
+    summary="Stream NDJSON Redaction",
+    description="""
+    Process newline-delimited JSON (NDJSON) stream with real-time redaction.
+    
+    **Input Format:**
+    - Each line must be a valid JSON object
+    - Lines separated by newline characters (\\n)
+    - Content-Type: application/x-ndjson or text/plain
+    
+    **Output Format:**
+    - Redacted NDJSON stream (same format as input)
+    - Each line is independently redacted
+    - Streaming response for efficient processing
+    
+    **Example Input:**
+    ```
+    {"name": "John Doe", "email": "john@example.com"}
+    {"phone": "555-1234", "ssn": "123-45-6789"}
+    ```
+    
+    **Example Output:**
+    ```
+    {"name": "********", "email": "j**n@e******.com"}
+    {"phone": "555-1234", "ssn": "*******6789"}
+    ```
+    """,
+    responses={
+        200: {
+            "description": "Streaming NDJSON response with redacted data",
+            "content": {
+                "application/x-ndjson": {
+                    "example": '{"name":"********","email":"j**n@e******.com"}\\n{"phone":"555-1234","ssn":"*******6789"}\\n'
+                }
+            }
+        }
+    }
+)
 async def stream_redact_ndjson(
-    request_body: bytes = Depends(lambda: None),  # Raw body
+    ndjson_data: str = Body(
+        ...,
+        media_type="text/plain",
+        description="Newline-delimited JSON data (one JSON object per line)",
+        example='{"name": "John Doe", "email": "john@example.com"}\n{"phone": "555-1234", "ssn": "123-45-6789"}'
+    ),
     api_key: str = Depends(verify_api_key)
 ):
     """
@@ -44,11 +88,8 @@ async def stream_redact_ndjson(
             total_redactions = 0
             
             try:
-                # Read request body (streaming)
-                # In a real implementation, this would be streamed
-                body_text = request_body.decode('utf-8') if request_body else ""
-                
-                for line in body_text.strip().split('\n'):
+                # Process NDJSON data
+                for line in ndjson_data.strip().split('\n'):
                     if not line.strip():
                         continue
                     
@@ -56,8 +97,7 @@ async def stream_redact_ndjson(
                         # Parse JSON line
                         data = json.loads(line)
                         
-                        # Apply redaction
-                        engine.reset_meta()
+                        # Apply redaction (engine creates new meta per redact call)
                         redacted_data = engine.redact(data)
                         redaction_meta = engine.get_redaction_meta()
                         
@@ -100,12 +140,40 @@ async def stream_redact_ndjson(
 @router.websocket("/redact/ws")
 async def websocket_redact(websocket: WebSocket):
     """
-    WebSocket endpoint for real-time redaction.
+    WebSocket endpoint for real-time bidirectional redaction.
     
-    Clients can send JSON objects and receive redacted versions in real-time.
-    Protocol:
-    - Send: {"data": {...}, "include_meta": true/false}
-    - Receive: {"redacted_data": {...}, "redaction_meta": [...]}
+    Establishes a persistent WebSocket connection for interactive redaction.
+    Perfect for chat applications, real-time data feeds, or interactive systems.
+    
+    **Connection:**
+    ```javascript
+    const ws = new WebSocket('ws://localhost:8000/stream/redact/ws');
+    ```
+    
+    **Send Message Format:**
+    ```json
+    {
+        "data": {"name": "John Doe", "email": "john@example.com"},
+        "include_meta": true
+    }
+    ```
+    
+    **Receive Message Format:**
+    ```json
+    {
+        "redacted_data": {"name": "********", "email": "j**n@e******.com"},
+        "policy_version": "1.4",
+        "redaction_meta": [
+            {"field": "name", "rule": "PERSON", "action": "mask"},
+            {"field": "email", "rule": "EMAIL", "action": "preserve_structure"}
+        ]
+    }
+    ```
+    
+    **Error Response:**
+    ```json
+    {"error": "Missing 'data' field in message"}
+    ```
     """
     await websocket.accept()
     
@@ -135,8 +203,7 @@ async def websocket_redact(websocket: WebSocket):
                         })
                         continue
                     
-                    # Apply redaction
-                    engine.reset_meta()
+                    # Apply redaction (engine creates new meta per redact call)
                     redacted_data = engine.redact(message["data"])
                     redaction_meta = engine.get_redaction_meta()
                     
@@ -190,8 +257,57 @@ async def websocket_redact(websocket: WebSocket):
         logger.info("WebSocket redaction session ended")
 
 
-@router.post("/redact/chunked")
+@router.post(
+    "/redact/chunked",
+    response_class=StreamingResponse,
+    summary="Chunked Stream Redaction",
+    description="""
+    Process large datasets in chunks with real-time redaction.
+    
+    **Features:**
+    - Processes data in manageable chunks
+    - Provides per-chunk redaction statistics
+    - Stream start/end markers for tracking
+    - Efficient for large file processing
+    
+    **Input Format:**
+    Send a JSON array of objects to process in chunks.
+    
+    **Response Format:**
+    Each chunk is a JSON object with:
+    - `chunk_id`: Sequential chunk number
+    - `data`: Redacted data object
+    - `redactions`: Number of redactions in this chunk
+    
+    **Example Output:**
+    ```json
+    {"stream_start": true, "policy_version": "1.4"}
+    {"chunk_id": 1, "data": {"name": "***", "email": "***"}, "redactions": 2}
+    {"chunk_id": 2, "data": {"phone": "***", "ssn": "***"}, "redactions": 2}
+    {"stream_end": true, "total_chunks": 2, "total_redactions": 4}
+    ```
+    """,
+    responses={
+        200: {
+            "description": "Streaming chunked response with redaction statistics",
+            "content": {
+                "application/json": {
+                    "example": '{"stream_start":true,"policy_version":"1.4"}\\n{"chunk_id":1,"data":{"name":"***"},"redactions":1}\\n{"stream_end":true,"total_chunks":1,"total_redactions":1}'
+                }
+            }
+        }
+    }
+)
 async def stream_redact_chunked(
+    data_chunks: Optional[list] = Body(
+        None,
+        description="Optional array of data objects to process in chunks. If not provided, uses demo data.",
+        example=[
+            {"name": "Alice Johnson", "email": "alice@example.com"},
+            {"phone": "555-123-4567", "card": "4111111111111111"},
+            {"address": "123 Main St", "ssn": "123-45-6789"}
+        ]
+    ),
     api_key: str = Depends(verify_api_key)
 ):
     """
@@ -222,15 +338,18 @@ async def stream_redact_chunked(
                 yield policy_loader.get_policy_version().encode('utf-8')
                 yield b'"}\n'
                 
-                # Process chunks (simulated)
-                sample_data = [
-                    {"name": "Alice Johnson", "email": "alice@example.com"},
-                    {"phone": "555-123-4567", "card": "4111111111111111"},
-                    {"address": "123 Main St", "ssn": "123-45-6789"}
-                ]
+                # Use provided data or default sample data
+                if data_chunks is None or len(data_chunks) == 0:
+                    sample_data = [
+                        {"name": "Alice Johnson", "email": "alice@example.com"},
+                        {"phone": "555-123-4567", "card": "4111111111111111"},
+                        {"address": "123 Main St", "ssn": "123-45-6789"}
+                    ]
+                else:
+                    sample_data = data_chunks
                 
                 for chunk_data in sample_data:
-                    engine.reset_meta()
+                    # Apply redaction (engine creates new meta per redact call)
                     redacted_chunk = engine.redact(chunk_data)
                     redaction_meta = engine.get_redaction_meta()
                     
@@ -277,7 +396,34 @@ async def stream_redact_chunked(
 
 
 # Health check for streaming
-@router.get("/health")
+@router.get(
+    "/health",
+    summary="Streaming Service Health Check",
+    description="""
+    Check the health status of all streaming endpoints.
+    
+    Returns information about available streaming endpoints and supported protocols.
+    Use this endpoint to verify the streaming service is operational before connecting.
+    """,
+    responses={
+        200: {
+            "description": "Streaming service is healthy",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "healthy",
+                        "endpoints": {
+                            "ndjson": "/stream/redact/ndjson",
+                            "websocket": "/stream/redact/ws",
+                            "chunked": "/stream/redact/chunked"
+                        },
+                        "protocols": ["HTTP/1.1", "WebSocket"]
+                    }
+                }
+            }
+        }
+    }
+)
 async def streaming_health():
     """Health check for streaming endpoints."""
     return {
