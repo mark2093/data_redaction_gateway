@@ -20,6 +20,11 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/redact", tags=["Redaction"])
 
+# Shared metrics instance (same as metrics router)
+from ...observability.metrics import get_metrics_collector
+_metrics = get_metrics_collector()
+
+
 
 @router.post("/", response_model=RedactionResponse)
 async def redact_data(
@@ -68,12 +73,9 @@ async def redact_data(
         # Calculate processing time
         processing_time = (time.time() - start_time) * 1000
         
-        # Update metrics (will be injected via dependency injection)
-        # For now, creating a temporary instance
-        from ...observability import MetricsCollector
-        metrics = MetricsCollector()
-        metrics.record_request(processing_time)
-        metrics.record_redactions(len(redaction_meta) if redaction_meta else 0)
+        # Update metrics using shared instance
+        _metrics.record_request(processing_time)
+        _metrics.record_redactions(len(redaction_meta) if redaction_meta else 0)
         
         # LLM-as-Judge validation (sampled)
         judge_result = None
@@ -89,10 +91,10 @@ async def redact_data(
                 
                 # Record judge call in metrics
                 if judge_result is None:
-                    metrics.record_judge_call(fallback=True)
+                    _metrics.record_judge_call(fallback=True)
                     logger.info("LLM judge validation fell back to rules-only mode")
                 else:
-                    metrics.record_judge_call(fallback=False)
+                    _metrics.record_judge_call(fallback=False)
                     logger.info(
                         f"LLM judge validation: coverage={judge_result.coverage_complete}, "
                         f"confidence={judge_result.confidence}%"
@@ -101,7 +103,7 @@ async def redact_data(
             except Exception as judge_error:
                 # Gracefully handle judge errors
                 logger.error(f"LLM judge error: {judge_error}", exc_info=True)
-                metrics.record_judge_call(fallback=True)
+                _metrics.record_judge_call(fallback=True)
                 judge_result = None
         
         # Build response
@@ -181,6 +183,7 @@ async def redact_batch(
     Batch redaction endpoint for processing multiple items.
     
     Processes multiple redaction requests in a single API call.
+    Includes LLM Judge validation with batch-aware sampling.
     """
     start_time = time.time()
     
@@ -192,17 +195,75 @@ async def redact_batch(
         # Create redaction engine
         engine = RedactionEngine(rules)
         
+        # Get LLM Judge for batch validation
+        llm_judge = get_llm_judge()
+        
         # Process each request
         results = []
         total_redactions = 0
+        judge_validations = []
+        items_validated = 0
         
-        for req in requests:
+        for idx, req in enumerate(requests):
+            # Store original data for judge validation
+            original_data = req.data
+            
+            # Perform redaction
             redacted_data = engine.redact(req.data)
             redaction_meta = engine.get_redaction_meta() if req.include_meta else None
             
+            # LLM Judge validation (batch-aware sampling)
+            judge_result = None
+            should_validate = False
+            
+            # Batch sampling strategy:
+            # 1. Always validate at least 1 item per batch (first item if small batch)
+            # 2. Apply normal sampling rate for larger batches
+            # 3. Ensure minimum coverage for quality assurance
+            if redaction_meta:
+                if len(requests) <= 5:
+                    # Small batch: validate first item
+                    should_validate = (idx == 0)
+                else:
+                    # Large batch: use sampling with minimum guarantee
+                    should_validate = llm_judge.should_sample() or (idx == 0 and items_validated == 0)
+            
+            if should_validate:
+                try:
+                    judge_result = await llm_judge.validate_redaction(
+                        original_data=original_data,
+                        redacted_data=redacted_data,
+                        redaction_meta=redaction_meta
+                    )
+                    
+                    if judge_result is None:
+                        _metrics.record_judge_call(fallback=True)
+                        logger.info(f"Batch item {idx}: LLM judge validation fell back to rules-only mode")
+                    else:
+                        _metrics.record_judge_call(fallback=False)
+                        items_validated += 1
+                        judge_validations.append({
+                            'item_index': idx,
+                            'coverage_complete': judge_result.coverage_complete,
+                            'over_redacted': judge_result.over_redacted,
+                            'under_redacted': judge_result.under_redacted,
+                            'confidence': judge_result.confidence,
+                            'suggestions': judge_result.suggestions
+                        })
+                        logger.info(
+                            f"Batch item {idx}: LLM judge validation - "
+                            f"coverage={judge_result.coverage_complete}, confidence={judge_result.confidence}%"
+                        )
+                        
+                except Exception as judge_error:
+                    logger.error(f"Batch item {idx}: LLM judge error: {judge_error}", exc_info=True)
+                    _metrics.record_judge_call(fallback=True)
+                    judge_result = None
+            
             results.append({
                 'redacted_data': redacted_data,
-                'redaction_meta': redaction_meta
+                'redaction_meta': redaction_meta,
+                'judge_result': judge_result
             })
             
             total_redactions += len(redaction_meta) if redaction_meta else 0
@@ -210,17 +271,37 @@ async def redact_batch(
         # Calculate processing time
         processing_time = (time.time() - start_time) * 1000
         
-        # Update metrics
-        metrics = MetricsCollector()
-        metrics.record_request(processing_time)
-        metrics.record_redactions(total_redactions)
+        # Update metrics using shared instance
+        _metrics.record_request(processing_time)
+        _metrics.record_redactions(total_redactions)
+        
+        # Calculate batch validation summary
+        validation_summary = None
+        if judge_validations:
+            avg_confidence = sum(v['confidence'] for v in judge_validations) / len(judge_validations)
+            all_complete = all(v['coverage_complete'] for v in judge_validations)
+            any_over_redacted = any(v.get('over_redacted', False) for v in judge_validations)
+            any_under_redacted = any(v.get('under_redacted', False) for v in judge_validations)
+            total_suggestions = sum(len(v.get('suggestions', [])) for v in judge_validations)
+            
+            validation_summary = {
+                'items_validated': items_validated,
+                'validation_rate': round((items_validated / len(requests)) * 100, 2),
+                'average_confidence': round(avg_confidence, 2),
+                'all_coverage_complete': all_complete,
+                'any_over_redacted': any_over_redacted,
+                'any_under_redacted': any_under_redacted,
+                'total_suggestions': total_suggestions,
+                'validations': judge_validations
+            }
         
         return {
             'results': results,
             'total_processed': len(requests),
             'total_redactions': total_redactions,
             'policy_version': policy_loader.get_policy_version(),
-            'processing_time_ms': processing_time
+            'processing_time_ms': processing_time,
+            'validation_summary': validation_summary
         }
         
     except Exception as e:

@@ -7,14 +7,14 @@ from fastapi import APIRouter, Depends, Query
 
 from ...core.models.api import MetricsResponse
 from ...security import verify_api_key
-from ...observability import MetricsCollector
+from ...observability import get_metrics_collector
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/metrics", tags=["Monitoring"])
 
-# Global metrics instance - will be moved to dependency injection
-_metrics = MetricsCollector()
+# Global metrics instance (shared singleton)
+_metrics = get_metrics_collector()
 
 
 @router.get("/", response_model=MetricsResponse)

@@ -518,4 +518,24 @@ class MetricsCollector:
         logger.info("Metrics reset")
 
 
+# Global singleton instance
+_metrics_instance = None
+_metrics_lock = threading.Lock()
+
+
+def get_metrics_collector() -> MetricsCollector:
+    """
+    Get the global singleton metrics collector instance.
+    
+    Returns:
+        Shared MetricsCollector instance
+    """
+    global _metrics_instance
+    if _metrics_instance is None:
+        with _metrics_lock:
+            if _metrics_instance is None:
+                _metrics_instance = MetricsCollector()
+                logger.info("Enhanced metrics collector initialized")
+    return _metrics_instance
+
 __all__ = ["MetricsCollector"]
