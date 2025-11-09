@@ -1,0 +1,144 @@
+{
+  "timestamp": "2025-11-09T11:18:51.559041",
+  "summary": {
+    "total": 22,
+    "passed": 22,
+    "failed": 0,
+    "warnings": 1,
+    "pass_rate": 100.0
+  },
+  "results": [
+    {
+      "test": "Basic Health Check",
+      "status": true,
+      "message": "Status: 200",
+      "response_time": 2036.787509918213
+    },
+    {
+      "test": "Readiness Check",
+      "status": true,
+      "message": "Status: 200",
+      "response_time": 2048.902988433838
+    },
+    {
+      "test": "Liveness Check",
+      "status": true,
+      "message": "Status: 200",
+      "response_time": 2034.062147140503
+    },
+    {
+      "test": "Redact Chat Message #1 (MASK)",
+      "status": true,
+      "message": "Status: 200",
+      "response_time": 6647.040843963623
+    },
+    {
+      "test": "Redact Chat Message #2 (MASK)",
+      "status": true,
+      "message": "Status: 200",
+      "response_time": 3683.844566345215
+    },
+    {
+      "test": "Redact Order Data (TOKENIZE)",
+      "status": true,
+      "message": "Status: 200",
+      "response_time": 2079.073667526245
+    },
+    {
+      "test": "Redact Transaction Data (HASH)",
+      "status": true,
+      "message": "Status: 200",
+      "response_time": 2049.6513843536377
+    },
+    {
+      "test": "Redact with FPE (Credit Card)",
+      "status": true,
+      "message": "Status: 200",
+      "response_time": 2075.8416652679443
+    },
+    {
+      "test": "Content Processing via Redaction",
+      "status": true,
+      "message": "Status: 200",
+      "response_time": 2087.78977394104
+    },
+    {
+      "test": "Get Policy Version",
+      "status": true,
+      "message": "Status: 200",
+      "response_time": 2048.76708984375
+    },
+    {
+      "test": "Validate Policy",
+      "status": true,
+      "message": "Status: 200",
+      "response_time": 2051.8105030059814
+    },
+    {
+      "test": "Get Basic Metrics",
+      "status": true,
+      "message": "Status: 200",
+      "response_time": 2060.628890991211
+    },
+    {
+      "test": "Get Detailed Metrics",
+      "status": true,
+      "message": "Status: 200",
+      "response_time": 2042.3994064331055
+    },
+    {
+      "test": "Get Endpoint Metrics",
+      "status": true,
+      "message": "Status: 200",
+      "response_time": 2060.8978271484375
+    },
+    {
+      "test": "Get Performance Metrics",
+      "status": true,
+      "message": "Status: 200",
+      "response_time": 2055.1998615264893
+    },
+    {
+      "test": "Login Success (Got JWT Token)",
+      "status": true,
+      "message": "Token obtained successfully",
+      "response_time": 0
+    },
+    {
+      "test": "Get Audit Statistics",
+      "status": true,
+      "message": "Status: 200",
+      "response_time": 2081.258535385132
+    },
+    {
+      "test": "Get Rate Limit Status",
+      "status": true,
+      "message": "Status: 200",
+      "response_time": 2042.1538352966309
+    },
+    {
+      "test": "Invalid Request Data (422)",
+      "status": true,
+      "message": "Status: 422",
+      "response_time": 2063.5993480682373
+    },
+    {
+      "test": "Non-existent Endpoint (404)",
+      "status": true,
+      "message": "Status: 404",
+      "response_time": 2066.826820373535
+    },
+    {
+      "test": "Method Not Allowed (405)",
+      "status": true,
+      "message": "Proper error handling",
+      "response_time": 0
+    },
+    {
+      "test": "Performance Under Load",
+      "status": true,
+      "message": "Avg: 2173.36ms, Min: 2049.31ms, Max: 2652.82ms (Target: <3000ms for test env)",
+      "response_time": 0
+    }
+  ]
+}

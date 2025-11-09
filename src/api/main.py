@@ -98,6 +98,27 @@ async def lifespan(app: FastAPI):
         for warning in validation['warnings']:
             logger.warning(f"  - {warning}")
     
+    # Bootstrap admin user if JWT is enabled
+    if SECURITY_ROUTERS_AVAILABLE:
+        try:
+            from ..security.jwt_auth import get_jwt_manager
+            from ..security.rbac import Role
+            
+            jwt_manager = get_jwt_manager()
+            if "admin" not in jwt_manager._users:
+                jwt_manager.create_user(
+                    username="admin",
+                    password="admin123",
+                    email="admin@example.com",
+                    full_name="Bootstrap Administrator",
+                    roles=[Role.ADMIN]
+                )
+                logger.info("✓ Bootstrap admin user created (username: admin, password: admin123)")
+            else:
+                logger.info("Admin user already exists")
+        except Exception as e:
+            logger.warning(f"Could not create bootstrap admin user: {e}")
+    
     yield
     
     # Shutdown
