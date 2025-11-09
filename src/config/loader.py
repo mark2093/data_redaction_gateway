@@ -8,6 +8,7 @@ import yaml
 import logging
 from pathlib import Path
 from typing import Any, Dict, Optional
+from dotenv import load_dotenv
 
 from .settings import AppConfig, ServerConfig, SecurityConfig, RedactionConfig, CacheConfig
 from .settings import ObservabilityConfig, LLMJudgeConfig, NERConfig, MetricsConfig, TracingConfig
@@ -30,7 +31,33 @@ class ConfigLoader:
         self.config_data: Dict[str, Any] = {}
         self.app_config: Optional[AppConfig] = None
         
+        # Load .env file first (before loading config)
+        self._load_env_file()
+        
         self.load_config()
+    
+    def _load_env_file(self) -> None:
+        """
+        Load environment variables from .env file.
+        
+        Searches for .env file in multiple locations:
+        1. Current working directory
+        2. Project root (where config/ folder is)
+        3. Parent of config_path
+        """
+        env_locations = [
+            Path.cwd() / '.env',
+            Path(__file__).parent.parent.parent / '.env',  # Project root
+            self.config_path.parent.parent / '.env'  # Parent of config/
+        ]
+        
+        for env_path in env_locations:
+            if env_path.exists():
+                load_dotenv(env_path, override=True)
+                logger.info(f"Loaded environment variables from {env_path}")
+                return
+        
+        logger.debug("No .env file found, using system environment variables only")
     
     def load_config(self) -> AppConfig:
         """

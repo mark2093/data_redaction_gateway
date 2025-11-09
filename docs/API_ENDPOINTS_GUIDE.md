@@ -1526,21 +1526,37 @@ DELETE /audit/events?before=2025-10-01T00:00:00Z
 
 ## Authentication & Security
 
+> ⚠️ **SECURITY NOTICE:** All secrets MUST be configured via environment variables. Do not hardcode API keys, JWT secrets, or encryption keys in config files.
+
 ### API Key Authentication
 
 Used for most endpoints. Include in request header:
 
 ```
-X-API-Key: dev-api-key-12345
+X-API-Key: your-api-key-here
 ```
 
-**Configuration:** Set in `config/config.yaml`
-```yaml
-security:
-  api_keys:
-    - "dev-api-key-12345"
-    - "prod-api-key-67890"
+**Configuration:** Set via `API_KEYS` environment variable (comma-separated)
+
+**Quick Setup:**
+```powershell
+# PowerShell - Generate secure API keys
+$apiKey1 = [Convert]::ToBase64String((1..32 | ForEach-Object { Get-Random -Maximum 256 }))
+$apiKey2 = [Convert]::ToBase64String((1..32 | ForEach-Object { Get-Random -Maximum 256 }))
+Write-Host "API_KEYS=$apiKey1,$apiKey2"
 ```
+
+```bash
+# Bash - Generate secure API keys
+echo "API_KEYS=$(openssl rand -base64 32),$(openssl rand -base64 32)"
+```
+
+**In .env file:**
+```bash
+API_KEYS=key1-here,key2-here,key3-here
+```
+
+See [Environment Variables Guide](ENVIRONMENT_VARIABLES_GUIDE.md) for complete setup instructions.
 
 ---
 
@@ -1562,9 +1578,15 @@ POST /auth/login
 Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ```
 
+**Required Environment Variable:**
+```bash
+# Generate JWT secret (minimum 64 bytes recommended)
+JWT_SECRET_KEY=your-secret-key-here
+```
+
 **Token Expiry:**
-- Access Token: 30 minutes
-- Refresh Token: 7 days
+- Access Token: 30 minutes (configurable via `JWT_ACCESS_TOKEN_EXPIRE_MINUTES`)
+- Refresh Token: 7 days (configurable via `JWT_REFRESH_TOKEN_EXPIRE_DAYS`)
 
 **Roles & Permissions:**
 

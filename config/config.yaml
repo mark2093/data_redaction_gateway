@@ -17,24 +17,26 @@ server:
 
 # Security Settings
 security:
-  # API Keys (override with environment variable API_KEYS)
-  api_keys:
-    - "dev-api-key-12345"
-    - "test-api-key-67890"
+  # API Keys - MUST be set via environment variable API_KEYS (comma-separated)
+  # Example: API_KEYS="key1,key2,key3"
+  # For development, use .env file. For production, use secure secret management.
+  api_keys: []  # Empty - requires environment variable
   
   # JWT Authentication
   jwt:
     enabled: true
-    secret_key: "${JWT_SECRET_KEY}"  # Set via environment variable
+    secret_key: "${JWT_SECRET_KEY}"  # REQUIRED: Set via environment variable
     algorithm: "HS256"
     access_token_expire_minutes: 30
     refresh_token_expire_days: 7
   
-  # HMAC key for tokenization (override with HMAC_SECRET_KEY)
-  hmac_secret: "default-hmac-key-change-in-production"
+  # HMAC key for tokenization - MUST be set via HMAC_SECRET_KEY environment variable
+  # Generate with: openssl rand -base64 32
+  hmac_secret: "${HMAC_SECRET_KEY}"  # REQUIRED: Set via environment variable
   
-  # Encryption key for FPE (override with ENCRYPTION_KEY)
-  encryption_key: "default-encryption-key-change-in-production"
+  # Encryption key for FPE - MUST be set via ENCRYPTION_KEY environment variable
+  # Generate with: openssl rand -base64 32
+  encryption_key: "${ENCRYPTION_KEY}"  # REQUIRED: Set via environment variable
   
   # Rate Limiting
   rate_limit:
